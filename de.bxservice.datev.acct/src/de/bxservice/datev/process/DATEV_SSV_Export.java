@@ -40,6 +40,7 @@ import org.compiere.model.MProcessPara;
 import org.compiere.model.MQuery;
 import org.compiere.model.MTable;
 import org.compiere.model.PrintInfo;
+import org.compiere.model.Query;
 import org.compiere.print.MPrintFormat;
 import org.compiere.print.ReportEngine;
 import org.compiere.process.ProcessInfo;
@@ -73,7 +74,7 @@ public class DATEV_SSV_Export extends SvrProcess{
 
 	@Override
 	protected String doIt() throws Exception {
-		MPrintFormat pf = MPrintFormat.get (Env.getCtx(), 1000034, true); // DATEV Export (Template) / 43841009-8a28-4e08-8052-72e9a6899398
+		MPrintFormat pf = new Query(getCtx(), MPrintFormat.Table_Name, "value='DATEV'", get_TrxName()).firstOnly();
 		MQuery query = new MQuery(MTable.getTableName(getCtx(), pf.get_Table_ID()));
 		query.addRangeRestriction("BX_DATEV_Datum", p_BX_DATEV_Datum, p_BX_DATEV_Datum_To);
 		PrintInfo info = new PrintInfo(pf.getName(), pf.getAD_Table_ID(), 0);
