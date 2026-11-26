@@ -28,6 +28,8 @@ package de.bxservice.datev.acct;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.logging.Level;
 
 import org.compiere.acct.Doc;
@@ -40,6 +42,7 @@ import org.compiere.model.MAcctSchema;
 import org.compiere.model.MInvoiceLine;
 import org.compiere.model.MTax;
 import org.compiere.model.ProductCost;
+import org.compiere.util.Env;
 
 /**
  *
@@ -89,8 +92,7 @@ public class Doc_DatevInvoice extends Doc_Invoice {
 	 */
 	@Override
 	public ArrayList<Fact> createFacts(MAcctSchema as) {
-		/* TODO: Validate - multi-tax invoiced not supported */
-		/* TODO: Validate - summary taxes not supported */
+		/* TODO: Validate - multi-tax invoices not supported */
 		/* TODO: Validate - lines without charge or product not supported */
 		//
 		ArrayList<Fact> facts = new ArrayList<Fact>();
@@ -109,15 +111,34 @@ public class Doc_DatevInvoice extends Doc_Invoice {
 		else
 			payables_ID = getValidCombination_ID(Doc.ACCTTYPE_V_Liability, as);
 
+		// Create a list of running taxes to keep track of document level taxes
+		Map<Integer, BigDecimal> taxTotals = new LinkedHashMap<>();
+		for (DocTax docTax : m_taxes)
+			taxTotals.merge(docTax.getC_Tax_ID(), docTax.getAmount(), BigDecimal::add);
+
 		for (DocLine docLine : p_lines) {
 
 			MInvoiceLine il = (MInvoiceLine) docLine.getPO();
-			// docLine.getAmtSource() is without tax, we need it including tax
-			// WARNING: This must work just for taxes that are non-summary
-			BigDecimal amtTotal = il.getLineTotalAmt();
-			BigDecimal amtNet = docLine.getAmtSource();
-			BigDecimal amtTax = amtTotal.subtract(amtNet);
 			MTax tax = MTax.get(il.getC_Tax_ID());
+			BigDecimal amtTotal = null;
+			BigDecimal amtNet = null;
+			BigDecimal amtTax = null;
+			// docLine.getAmtSource() is without tax, we need it including tax
+			amtNet = docLine.getAmtSource();
+			if (tax.isDocumentLevel()) {
+				// we need to calculate the tax amount for document level taxes, as the line total does not include it
+				amtTax = tax.calculateTax(amtNet, isTaxIncluded(), il.getPrecision());
+				final BigDecimal finalAmt = amtTax;
+				taxTotals.compute(il.getC_Tax_ID(), (k, v) -> (v == null ? Env.ZERO : v).subtract(finalAmt));
+				BigDecimal diff = taxTotals.get(il.getC_Tax_ID());
+				if (diff != null && diff.signum() < 0)
+					amtTax = amtTax.add(diff);
+				amtTotal = amtNet.add(amtTax);
+			} else {
+				// line level tax, we can use the line total amount directly
+				amtTotal = il.getLineTotalAmt();
+				amtTax = amtTotal.subtract(amtNet);
+			}
 			DocTax docTax = new DocTax(tax.getC_Tax_ID(), tax.getName(), tax.getRate(), amtNet, amtTax, tax.isSalesTax());
 
 			// Accounts
