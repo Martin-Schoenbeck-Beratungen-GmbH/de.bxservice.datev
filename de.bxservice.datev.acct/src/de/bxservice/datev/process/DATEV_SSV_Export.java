@@ -73,7 +73,7 @@ public class DATEV_SSV_Export extends SvrProcess{
 
 	@Override
 	protected String doIt() throws Exception {
-		MPrintFormat pf = MPrintFormat.get (Env.getCtx(), 1000034, true); // DATEV Export (Template) / 43841009-8a28-4e08-8052-72e9a6899398
+		MPrintFormat pf = new MPrintFormat(Env.getCtx(), "43841009-8a28-4e08-8052-72e9a6899398", null); // DATEV Export (Template) / 
 		MQuery query = new MQuery(MTable.getTableName(getCtx(), pf.get_Table_ID()));
 		query.addRangeRestriction("BX_DATEV_Datum", p_BX_DATEV_Datum, p_BX_DATEV_Datum_To);
 		PrintInfo info = new PrintInfo(pf.getName(), pf.getAD_Table_ID(), 0);
